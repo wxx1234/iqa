@@ -13,6 +13,9 @@ import copy
 import ctypes
 
 
+# import cudamat as cm
+
+
 def rgb2hsy(*rgb_tuple):  # inumpyut an image or its RGB components
     nargin = len(rgb_tuple)
 
@@ -327,6 +330,19 @@ def tm_function(img, ord):
     return mmt
 
 
+def tm_function_gpu(img, ord):
+    img = cm.CUDAMatrix(numpy.array(img))
+    nx, ny = img.shape
+    n = ord
+    m = ord
+    tx = tm_kernel_blur(nx, n)
+    ty = tm_kernel_blur(ny, m)
+    tx = cm.CUDAMatrix(numpy.array(tx))
+    ty = cm.CUDAMatrix(numpy.array(ty))
+    mmt = ty.dot(img).dot(tx.transpose())
+    return mmt
+
+
 def var2(mtx, mn=None):
     if not mn:
         mn = numpy.mean(mean(mtx))
@@ -518,22 +534,20 @@ def bible_func(img_dst, img_gradient, img_orgdst, order=None, blkSZ=8):
         order = blkSZ - 1
 
     energy = []
-    # tt = datetime.datetime.now()
+    t1 = datetime.datetime.now()
     img_block, var_gray, Rnum, Cnum = block_func(img_dst, img_gradient, blkSZ)
-    # print('bb:{}'.format((datetime.datetime.now() - tt).total_seconds()))
-
+    print((datetime.datetime.now() - t1).total_seconds())
     saliency_map = sdsp(img_orgdst)
     saliency_map = mat2gray(imresize(saliency_map, (Rnum, Cnum), mode='F'))
-
     # tt = datetime.datetime.now()
     # print(img_block.shape[1], img_block.shape, Rnum, Cnum)
-
     # ttt = datetime.datetime.now()
     for k in range(img_block.shape[1]):
-        block = transpose(img_block[:, k].reshape((blkSZ, blkSZ)))
+        block = img_block[:, k].reshape((blkSZ, blkSZ)).transpose()
         mmt = tm_function(block, order)
         mmt[0, 0] = 0
         energy.append(numpy.sum(numpy.multiply(mmt, mmt)))
+    print((datetime.datetime.now() - t1).total_seconds())
     # print((datetime.datetime.now() - ttt).total_seconds())
     # print('bb1:{}'.format((datetime.datetime.now() - tt).total_seconds()))
 
@@ -547,15 +561,6 @@ def bible_func(img_dst, img_gradient, img_orgdst, order=None, blkSZ=8):
 
 
 def lum_contrast(image, bit_depth):
-    """
-
-    :param image:
-    :param bit_depth:
-    TO DO :bit_depth not finished
-    :return:
-    """
-    lmin = 0
-    lmax = 2 ** bit_depth - 1
     x, f = numpy.unique(image, return_counts=True)
     f = f / sum(f)
     t, md, mb = compute_threshold(f, x, 1)
@@ -638,17 +643,17 @@ def compute_mmt(a, b, c):
 
 def cut_image(im, h, w, thres=500):
     if h > thres:
-        r = im[(h - thres) / 2:(h + thres) / 2, :, 0]
-        g = im[(h - thres) / 2:(h + thres) / 2, :, 1]
-        b = im[(h - thres) / 2:(h + thres) / 2, :, 2]
+        r = im[int((h - thres) / 2):int((h + thres) / 2), :, 0]
+        g = im[int((h - thres) / 2):int((h + thres) / 2), :, 1]
+        b = im[int((h - thres) / 2):int((h + thres) / 2), :, 2]
     else:
         r = im[:, :, 0]
         g = im[:, :, 1]
         b = im[:, :, 2]
     if w > thres:
-        r = r[:(w - thres) / 2:(w + thres) / 2]
-        g = g[:(w - thres) / 2:(w + thres) / 2]
-        b = b[:(w - thres) / 2:(w + thres) / 2]
+        r = r[:int((w - thres) / 2):int((w + thres) / 2)]
+        g = g[:int((w - thres) / 2):int((w + thres) / 2)]
+        b = b[:int((w - thres) / 2):int((w + thres) / 2)]
     else:
         r = r[:, :]
         g = g[:, :]
@@ -695,7 +700,6 @@ class ImageQualityAssess:
                 BK1 = numpy.mat(self.im_double[(i - 1) * 8:i * 8, (j - 1) * 8 + 4:j * 8 + 4])
                 BK2 = numpy.mat(self.im_double[(i - 1) * 8 + 4:i * 8 + 4, (j - 1) * 8:j * 8])
                 BK3 = numpy.mat(self.im_double[(i - 1) * 8:i * 8, (j - 1) * 8:j * 8])
-
                 E = numpy.sum(BK3) / 64
                 SSM = 0
                 for u in range(1, 9):
@@ -710,7 +714,6 @@ class ImageQualityAssess:
 
                 q1 = numpy.sum(numpy.abs(MMT1[7, :])) / (numpy.sum(abs(MMT1)) - numpy.abs(MMT1[0, 0]) + c)
                 q2 = numpy.sum(numpy.abs(MMT2[:, 7])) / (numpy.sum(abs(MMT2)) - numpy.abs(MMT2[0, 0]) + c)
-
                 if q1 > 0.05:
                     q1 = 0.05
                 if q2 > 0.05:
@@ -732,11 +735,11 @@ class ImageQualityAssess:
         height, width = self.gray.shape
         thre = 800
         if height > thre:
-            gray = self.gray[height / 2 - thre / 2:height / 2 + thre / 2, :]
+            gray = self.gray[int(height / 2 - thre / 2):int(height / 2 + thre / 2), :]
         else:
             gray = self.gray
         if width > thre:
-            gray = gray[:, width / 2 - thre / 2:width / 2 + thre / 2]
+            gray = gray[:, int(width / 2 - thre / 2):int(width / 2 + thre / 2)]
         else:
             gray = gray
         im = cut_image(self.im, height, width, thre)
@@ -752,10 +755,13 @@ class ImageQualityAssess:
         gy[SZx - 1, :] = gray[SZx - 1, :] - gray[SZx - 2, :]
 
         img_gradient = (abs(gx) + abs(gy)) / 2
+        print((datetime.datetime.now() - tt).total_seconds())
         return bible_func(gray, img_gradient, im, order, blkSZ)
 
     def contrast(self, bit_depth=8):
+        tt = datetime.datetime.now()
         global_contrast = lum_contrast(self.gray, bit_depth)
+        print((datetime.datetime.now() - tt).total_seconds())
         rows, cols = self.gray.shape
         block_size = 64
         whole_block_rows = int(floor(rows / block_size))
@@ -790,20 +796,6 @@ class ImageQualityAssess:
         exposure.restype = ctypes.c_double
         exposure_score = exposure(w, h, ctypes.byref(arr))
         return exposure_score
-
-    def noise(self):
-        height, width = self.gray.shape
-        w = ctypes.c_uint64(width)
-        h = ctypes.c_uint64(height)
-        arr = list(map(ctypes.c_byte, self.gray.reshape((width * height,)).astype(int)))
-        arr = (ctypes.c_byte * len(arr))(*arr)
-        noise = self.clib.noise
-        noise.restype = ctypes.c_double
-        noise_score = noise(w, h, ctypes.byref(arr))
-        return noise_score
-
-    def color(self):
-        return color_compute(self.im)
 
     def blackout(self):
         height, width = self.gray.shape
@@ -879,9 +871,20 @@ class ImageQualityAssess:
                                   ctypes.c_double(f_ps))
         return freezing_score
 
+    def noise(self):
+        height, width = self.gray.shape
+        w = ctypes.c_uint64(width)
+        h = ctypes.c_uint64(height)
+        arr = list(map(ctypes.c_byte, self.gray.reshape((width * height,)).astype(int)))
+        arr = (ctypes.c_byte * len(arr))(*arr)
+        noise = self.clib.noise
+        noise.restype = ctypes.c_double
+        noise_score = noise(w, h, ctypes.byref(arr))
+        return noise_score
+
 
 if __name__ == '__main__':
-    frame = cv2.imread('C:/Users/wangxh/Desktop/test.jpg')
+    frame = cv2.imread('test.jpg')
 
     im = numpy.array(frame)
     im[:, :, 0] = frame[:, :, 2]
@@ -890,35 +893,30 @@ if __name__ == '__main__':
 
     iqa = ImageQualityAssess(im=im)
 
-    t0 = datetime.datetime.now()
-    blur = iqa.blur() * 10
-    time_cost_blur = (datetime.datetime.now() - t0).total_seconds()
-    print('blur={}     timecost:{}s'.format(round(blur, 3), time_cost_blur))
-
+    # t0 = datetime.datetime.now()
+    # blur = iqa.blur() * 10
+    # time_cost_blur = (datetime.datetime.now() - t0).total_seconds()
+    # print('blur={}     timecost:{}s'.format(round(blur, 3), time_cost_blur))
+    #
     t0 = datetime.datetime.now()
     block = iqa.block() * 100
     time_cost_block = (datetime.datetime.now() - t0).total_seconds()
     print('block={}     timecost:{}s'.format(round(block, 3), time_cost_block))
 
+    # t0 = datetime.datetime.now()
+    # contrast = iqa.contrast() * 100
+    # time_cost_contrast = (datetime.datetime.now() - t0).total_seconds()
+    # print('contrast={}     timecost:{}s'.format(round(contrast, 3), time_cost_contrast))
+
     t0 = datetime.datetime.now()
-    contrast = iqa.contrast() * 100
+    exposure = iqa.exposure()
     time_cost_contrast = (datetime.datetime.now() - t0).total_seconds()
-    print('contrast={}     timecost:{}s'.format(round(contrast, 3), time_cost_contrast))
+    print('exposure={}     timecost:{}s'.format(round(exposure, 3), time_cost_contrast))
 
     t0 = datetime.datetime.now()
-    exposure = iqa.exposure() / 2.55
-    time_cost_exposure = (datetime.datetime.now() - t0).total_seconds()
-    print('exposure={}     timecost:{}s'.format(round(exposure, 3), time_cost_exposure))
-
-    t0 = datetime.datetime.now()
-    noise = iqa.noise() * 10 / 3
+    noise = iqa.noise()
     time_cost_noise = (datetime.datetime.now() - t0).total_seconds()
     print('noise={}     timecost:{}s'.format(round(noise, 3), time_cost_noise))
-
-    t0 = datetime.datetime.now()
-    color = iqa.color()
-    time_cost_color = (datetime.datetime.now() - t0).total_seconds()
-    print('color={}     timecost:{}s'.format(round(color, 3), time_cost_color))
 
     t0 = datetime.datetime.now()
     blackout = iqa.blackout()
@@ -944,7 +942,3 @@ if __name__ == '__main__':
     letterbox = iqa.letterbox()
     time_cost_letterbox = (datetime.datetime.now() - t0).total_seconds()
     print('letterbox={}     timecost:{}s'.format(round(letterbox, 3), time_cost_letterbox))
-
-    time_total = time_cost_block + time_cost_blur + time_cost_color + time_cost_contrast + time_cost_exposure + time_cost_noise + time_cost_blackout + time_cost_blockloss + time_cost_interlace + time_cost_pillarbox + time_cost_letterbox
-
-    print(time_total)

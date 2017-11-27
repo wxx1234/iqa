@@ -74,7 +74,7 @@ def get_squality_mos_vbr(media_width, media_height, screen_size, qp, ppi_v: list
     return squality
 
 
-def model2_1(file_path, device='TV'):
+def model1_2(file_path, device='TV'):
     """
     % Calculate the video MOS with extracted parameters
     % ff_mos: the MOS calculated by the parameters extracted with FF_PROBE
@@ -233,10 +233,11 @@ def model2_1(file_path, device='TV'):
     frame_p_qp = np.array(frame_p_qp)
     mv_avg = (np.sum(frame_i_qp[:, 4]) + np.sum(frame_p_qp[:, 4])) / (len(frame_i_qp[:, 4]) + len(frame_p_qp[:, 4]))
     rsl = ppi_v
-    return ff_mos, ff_qp, sk_ratio, mv_avg, rsl
+    # return ff_mos, ff_qp, sk_ratio, mv_avg, rsl
+    return ff_mos
 
 
 if __name__ == '__main__':
     fpath = 'C:/Users/WXX/Desktop/model1_tool/Ori_data/ffprobe_csv_huawei/1.csv'
-    res = model2_1(fpath)
+    res = model1_2(fpath)
     print(res)

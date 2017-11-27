@@ -127,23 +127,10 @@ def model1_1_fbf_var(file_path, frame_rate, bit_rate):
     return ans
 
 
-def batch():
-    xdata = []
-    # csvFile = open("instance.csv", "w",newline='')#xdata is stored here
-    # writer = csv.writer(csvFile)
-    wb = load_workbook(filename="C:\\Users\\Administrator\\Desktop\\my python\\U-vMOS VBR盖亚_TV_v0.91_SJTU.xlsx")
-    ws = wb.get_sheet_by_name('video_fr_br')
-    for n in range(1, 71):
-        csv_filepath = "C:\\Users\\Administrator\\Desktop\\model1资料\\资料\\Ori_data\\ffprobe_csv_huawei"
-        frame_rate = ws.cell(row=n + 1, column=6).value
-        bit_rate = ws.cell(row=n + 1, column=7).value
-
-        tmp = model1_1_fbf_var(csv_filepath + '\\' + str(n) + '.csv', frame_rate, bit_rate)
-        # writer.writerow(l,)
-        xdata.append(tmp)
-    # csvFile.close()
-    return xdata
+def get_xdata(filepath, frame_rate, bit_rate):
+    tmp = model1_1_fbf_var(filepath, frame_rate, bit_rate)
+    return tmp
 
 
 if __name__ == '__main__':
-    print(batch())
+    print(get_xdata("C:/Users/WXX/Desktop/model1_tool/Ori_data/ffprobe_csv_huawei/1.csv", 25, 1188))

@@ -74,7 +74,8 @@ def get_squality_mos_vbr(media_width, media_height, screen_size, qp, ppi_v: list
     return squality
 
 
-def model1_2(file_path, device='TV'):
+def model1_2(file_path=None, width=None, height=None, qp_list=None, frame_type_list=None, skip_ratio=None, mv0=None,
+             mv1=None, number_of_frames=None, number_of_params=None, device='TV'):
     """
     % Calculate the video MOS with extracted parameters
     % ff_mos: the MOS calculated by the parameters extracted with FF_PROBE
@@ -86,7 +87,6 @@ def model1_2(file_path, device='TV'):
     % rsl: normalized resolution, used to select coefficient
 
     """
-
     if device == 'Phone':
         screen_size = 6
     else:
@@ -105,25 +105,25 @@ def model1_2(file_path, device='TV'):
     p576 = 7
 
     # color_type = ['b', 'g', 'r', 'b', 'g', 'r', 'b']
+    if file_path:
+        csv_data = pd.read_csv(file_path, names=['frame', 'pkt_pts', 'pkt_size', 'width', 'height', 'pict_type',
+                                                 'skip_ratio', 'qp_min', 'qp_max', 'qp_avg', 'mv0_min', 'mv0_max',
+                                                 'mv0_avg', 'mv1_min', 'mv1_max', 'mv1_avg'])
 
-    csv_data = pd.read_csv(file_path, names=['frame', 'pkt_pts', 'pkt_size', 'width', 'height', 'pict_type',
-                                             'skip_ratio', 'qp_min', 'qp_max', 'qp_avg', 'mv0_min', 'mv0_max',
-                                             'mv0_avg', 'mv1_min', 'mv1_max', 'mv1_avg'])
-
-    width = csv_data['width']
-    height = csv_data['height']
-    qp_list = csv_data['qp_avg']
-    frame_type_list = csv_data['pict_type']
-    skip_ratio = csv_data['skip_ratio']
-    for i in range(len(skip_ratio)):
-        skip_ratio.set_value(i, float(skip_ratio[i][:-1]) / 100)
-    mv0 = csv_data['mv0_avg']
-    csv_data = csv_data.dropna(axis=1, how='all')
-    number_of_frames, number_of_params = csv_data.shape
-    if number_of_params > 13:
-        mv1 = csv_data['mv1_avg']
-    else:
-        mv1 = mv0
+        width = csv_data['width']
+        height = csv_data['height']
+        qp_list = csv_data['qp_avg']
+        frame_type_list = csv_data['pict_type']
+        skip_ratio = csv_data['skip_ratio']
+        for i in range(len(skip_ratio)):
+            skip_ratio.set_value(i, float(skip_ratio[i][:-1]) / 100)
+        mv0 = csv_data['mv0_avg']
+        csv_data = csv_data.dropna(axis=1, how='all')
+        number_of_frames, number_of_params = csv_data.shape
+        if number_of_params > 13:
+            mv1 = csv_data['mv1_avg']
+        else:
+            mv1 = mv0
     pixels = height[0] * width[0]
     if height[0] == 576:
         ppi_v = p576
@@ -226,13 +226,13 @@ def model1_2(file_path, device='TV'):
                                  4] *
                              data_smooth[i - 4][1]) / HMESmooth[5]])
     ff_mos = np.mean(np.array(data_smooth)[:, 1])
-    ff_qp = np.mean(frame_qp)
-
-    sk_ratio = np.mean(frame_skip_ratio) * 100
-    frame_i_qp = np.array(frame_i_qp)
-    frame_p_qp = np.array(frame_p_qp)
-    mv_avg = (np.sum(frame_i_qp[:, 4]) + np.sum(frame_p_qp[:, 4])) / (len(frame_i_qp[:, 4]) + len(frame_p_qp[:, 4]))
-    rsl = ppi_v
+    # ff_qp = np.mean(frame_qp)
+    #
+    # sk_ratio = np.mean(frame_skip_ratio) * 100
+    # frame_i_qp = np.array(frame_i_qp)
+    # frame_p_qp = np.array(frame_p_qp)
+    # mv_avg = (np.sum(frame_i_qp[:, 4]) + np.sum(frame_p_qp[:, 4])) / (len(frame_i_qp[:, 4]) + len(frame_p_qp[:, 4]))
+    # rsl = ppi_v
     # return ff_mos, ff_qp, sk_ratio, mv_avg, rsl
     return ff_mos
 

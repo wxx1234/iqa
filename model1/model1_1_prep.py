@@ -4,89 +4,45 @@ Created on Sat Nov 25 17:09:54 2017
 
 @author: Administrator
 """
-from openpyxl import load_workbook
-import csv
+
 import numpy as np
+import pandas as pd
 
 
-def my_float(s):
-    if s is None or s == '':
-        return None
-    return float(s)
-
-
-def my_max(a, b):
-    if a is None and b is None:
-        return None
-    if a is None:
-        return b
-    elif b is None:
-        return a
-    elif a > b:
-        return a
-    else:
-        return b
-
-
-def model1_1_fbf_var(file_path, frame_rate, bit_rate):
-    csv_reader = csv.reader(open(file_path, encoding='utf-8'))
-
-    # parse the FFProbe data
-    frame_type_list = []
-    bit_size_list = []
-    width = []
-    height = []
-    qp_min_list = []
-    qp_max_list = []
-    qp_list = []
-    skip_ratio = []
-    mv0 = []
-    mv1 = []
-    is_empty = True
-
-    for row in csv_reader:
-        is_empty = False
-        frame_type_list.append(row[5])
-        bit_size_list.append(int(row[2]))
-        width.append(int(row[3]))
-        height.append(int(row[4]))
-        qp_min_list.append(int(row[7]))
-        qp_max_list.append(int(row[8]))
-        qp_list.append(float(row[9]))
-        skip_ratio.append(float(row[6].strip("%")) / 100)
-        mv0.append(my_float(row[12]))
-
-        if len(row) < 16:
-            mv1.append(None)
+def model1_1_fbf_var(file_path=None, width=None, height=None, qp_list=None, frame_type_list=None, skip_ratio=None,
+                     mv0=None, mv1=None, bit_size_list=None, qp_max_list=None, qp_min_list=None, frame_rate=None,
+                     bit_rate=None):
+    if file_path:
+        csv_data = pd.read_csv(file_path, names=['frame', 'pkt_pts', 'pkt_size', 'width', 'height', 'pict_type',
+                                                 'skip_ratio', 'qp_min', 'qp_max', 'qp_avg', 'mv0_min', 'mv0_max',
+                                                 'mv0_avg', 'mv1_min', 'mv1_max', 'mv1_avg'])
+        frame_type_list = csv_data['pict_type']
+        bit_size_list = csv_data['pkt_size']
+        width = csv_data['width']
+        height = csv_data['height']
+        qp_min_list = csv_data['qp_min']
+        qp_max_list = csv_data['qp_max']
+        qp_list = csv_data['qp_avg']
+        skip_ratio = csv_data['skip_ratio']
+        for i in range(len(skip_ratio)):
+            skip_ratio.set_value(i, float(skip_ratio[i][:-1]) / 100)
+        mv0 = csv_data['mv0_avg']
+        csv_data = csv_data.dropna(axis=1, how='all')
+        number_of_frames, number_of_params = csv_data.shape
+        if number_of_params > 13:
+            mv1 = csv_data['mv1_avg']
         else:
-            mv1.append(my_float(row[15]))
-
-    # default frame rate
-    #  frame_rate = 25;
-
-    # Some videos without B frames
-    # to simplify the process, set mv1 as mv0
-    if is_empty:
-        return [0] * 11
-    if len(frame_type_list) > 12:
-        pass
-    else:
-        mv1 = mv0
-
+            mv1 = mv0
     # I-frame Flicker Detection
     i_intra_flicker = 0.
-    ind = [i for i, a in enumerate(frame_type_list) if a == "I"]
+    ind = [i for i, a in enumerate(frame_type_list.tolist()) if a == "I"]
     for j in range(1, len(ind) - 1):
         if (qp_list[ind[j]] - qp_list[ind[j + 1]] > 5) and (qp_list[ind[j]] - qp_list[ind[j - 1]] > 5):
             i_intra_flicker = 1
-            flicker_location = ind[j]
             break
         else:
-            flicker_location = 0
             continue
-
-
-            ##IPB ststistics
+            # IPB ststistics
 
     # Temperal pooling for frame quality.
     # frame_quality = []; data_smooth = [];
@@ -99,16 +55,10 @@ def model1_1_fbf_var(file_path, frame_rate, bit_rate):
 
     count_all = 0
 
-    count_ii = 0
-    count_pp = 0
-    count_bb = 0  # caltulate the num of I/B/P
-    pixels = height[0] * width[0]
-
-    #   caltulate the num of I/B/P
+    # caltulate the num of I/B/P
     i_location = np.array(ind.copy())
     count_ii = len(i_location)
-    count_pp = len([i for i, a in enumerate(frame_type_list) if a == "P"])
-    count_bb = len([i for i, a in enumerate(frame_type_list) if a == "B"])
+    count_pp = len([i for i, a in enumerate(frame_type_list.tolist()) if a == "P"])
     nbr_between_two_i_pics = count_pp / count_ii
     kfr = frame_rate / nbr_between_two_i_pics
 
@@ -121,16 +71,13 @@ def model1_1_fbf_var(file_path, frame_rate, bit_rate):
             frame_i_sts.append(bit_size_list[i])
 
     ans = [np.mean(qp_list), frame_rate, i_intra_flicker, np.mean(qp_max_list), np.mean(qp_min_list), bit_rate,
-           np.mean(frame_i_sts), np.mean(skip_ratio), np.mean([my_max(mv0[i], mv1[i]) for i, a in enumerate(mv0)]), kfr,
-           width[0] * height[0]]
+           np.mean(frame_i_sts), np.mean(skip_ratio),
+           np.mean([max(mv0[i], mv1[i]) for i, a in enumerate(mv0.tolist())]), kfr, width[0] * height[0]]
 
     return ans
 
 
-def get_xdata(filepath, frame_rate, bit_rate):
-    tmp = model1_1_fbf_var(filepath, frame_rate, bit_rate)
-    return tmp
-
-
 if __name__ == '__main__':
-    print(get_xdata("C:/Users/WXX/Desktop/model1_tool/Ori_data/ffprobe_csv_huawei/1.csv", 25, 1188))
+    print(
+        model1_1_fbf_var(file_path="C:/Users/WXX/Desktop/model1_tool/Ori_data/ffprobe_csv_huawei/1.csv", frame_rate=25,
+                         bit_rate=1188))

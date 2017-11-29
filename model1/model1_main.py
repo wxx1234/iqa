@@ -1,6 +1,8 @@
 from model1.model1_1 import model1_1
 from model1.model1_2 import model1_2
 import pandas as pd
+from openpyxl import load_workbook
+import time
 
 
 def model1(filename, frame_rate, bit_rate):
@@ -14,7 +16,7 @@ def model1(filename, frame_rate, bit_rate):
     frame_type_list = csv_data['pict_type']
     skip_ratio = csv_data['skip_ratio']
     for i in range(len(skip_ratio)):
-        skip_ratio.set_value(i, float(skip_ratio[i][:-1]) / 100)
+        skip_ratio.set_value(i, float(skip_ratio[i].strip("%")) / 100)
     mv0 = csv_data['mv0_avg']
     csv_data = csv_data.dropna(axis=1, how='all')
     number_of_frames, number_of_params = csv_data.shape
@@ -37,5 +39,17 @@ def model1(filename, frame_rate, bit_rate):
 
 
 if __name__ == '__main__':
-    mos = model1("C:/Users/WXX/Desktop/model1_tool/Ori_data/ffprobe_csv_huawei/2.csv", 25, 1188)
-    print(mos)
+    wb = load_workbook(filename="C:/Users/WXX/Desktop/model1_tool/Ori_data/MOS_fr_br.xlsx")
+    ws = wb.get_sheet_by_name('Sheet1')
+    t = time.time()
+    for number in range(1, 116):
+        try:
+            br = ws.cell(row=number + 1, column=2).value
+            fr = ws.cell(row=number + 1, column=3).value
+            mos = model1(f'C:/Users/WXX/Desktop/model1_tool/Ori_data/sequence_info/{number}.csv', frame_rate=fr,
+                         bit_rate=br)
+            print(number, mos)
+        except:
+            print(f'---process {number}.csv fail---')
+    t = time.time() - t
+    print(f'total {t} seconds, averge {t/115} seconds')

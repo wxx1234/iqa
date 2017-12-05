@@ -18,14 +18,15 @@ alpha_4 = 0.4139
 beta_4 = -0.009638
 
 
-# def quality_of_live_session(t_zapping, t, T=10):
-#     q_zapping = c15 * math.exp(c16 * t_zapping) + c17 * math.exp(c18 * t_zapping)
-#     qi_liveinstant = q_zapping
-#     qi_live_session = (alpha_1 * math.exp(beta_1 * t / T) + alpha_2 * math.exp(beta_2 * t / T)) * qi_liveinstant
-#     return qi_live_session
-#
-#
-# def quality_of_vod_session(t_loading, t, T):
-#     q_loading = c19 * (t_loading ** 3) + c20 * (t_loading ** 2) + c21 * t_loading + c22
-#     qi_vod_instant = q_loading
-#     qi_vod_session
+def quality_of_live_session(t_zapping, t, T=10):
+    q_zapping = c15 * math.exp(c16 * t_zapping) + c17 * math.exp(c18 * t_zapping)
+    qi_live_instant = q_zapping
+    qi_live_session = (alpha_1 * math.exp(beta_1 * t / T) + alpha_2 * math.exp(beta_2 * t / T)) * qi_live_instant
+    return qi_live_session
+
+
+def quality_of_vod_session(t_loading, t, T=10):
+    q_loading = c19 * (t_loading ** 3) + c20 * (t_loading ** 2) + c21 * t_loading + c22
+    qi_vod_instant = q_loading
+    qi_vod_session = (alpha_3 * math.exp(beta_3 * t / T) + alpha_4 * math.exp(beta_4 * t / T)) * qi_vod_instant
+    return qi_vod_session

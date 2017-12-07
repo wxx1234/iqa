@@ -1,4 +1,6 @@
 import math
+import pandas as pd
+import os
 
 c15 = 2.249
 c16 = -0.001127
@@ -36,3 +38,23 @@ def quality_of_vod_session(t_loading, t, T=0):
         return qi_vod_session
     else:
         return qi_vod_instant
+
+
+def interaction_quality(csv_file):
+    ret = {}
+    os.chdir(os.path.dirname(csv_file))
+    csv_data = pd.read_csv(os.path.basename(csv_file), names=['name', 't', 't_zapping', 't_loading'])
+    names = csv_data['name']
+    ts = csv_data['t']
+    t_zappings = csv_data['t_zapping']
+    t_loadings = csv_data['t_loading']
+    for name, t, t_zapping, t_loading in zip(names, ts, t_zappings, t_loadings):
+        ret[name[1:-1]] = {'qi_live_session': min(quality_of_live_session(t_zapping, t), 5),
+                           'qi_vod_session': min(quality_of_vod_session(t_loading, t), 5)}
+    # import pprint
+    # pprint.pprint(ret)
+    return ret
+
+
+if __name__ == '__main__':
+    res = interaction_quality('C:/Users/WXX/Desktop/数据集样例/interaction quality/interaction quality.csv')

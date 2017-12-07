@@ -1,29 +1,33 @@
 from model1.model1_1 import model1_1
 from model1.model1_2 import model1_2
 import pandas as pd
-from openpyxl import load_workbook
 import time
+import os
+from os import listdir
+from os.path import isfile, join
 
 
-def model1(filename, frame_rate, bit_rate):
-    csv_data = pd.read_csv(filename, names=['frame', 'pkt_pts', 'pkt_size', 'width', 'height', 'pict_type',
-                                            'skip_ratio', 'qp_min', 'qp_max', 'qp_avg', 'mv0_min', 'mv0_max',
-                                            'mv0_avg', 'mv1_min', 'mv1_max', 'mv1_avg'])
+def list_all_files(file_path):
+    return [f for f in listdir(file_path) if isfile(join(file_path, f))]
+
+
+def model1_single(filename):
+    os.chdir(os.path.dirname(filename))
+    csv_data = pd.read_csv(os.path.basename(filename),
+                           names=['frame', 'pkt_pts', 'pkt_size', 'width', 'height', 'pict_type',
+                                  'skip_ratio', 'qp_min', 'qp_max', 'qp_avg', 'mv0_min', 'mv0_max',
+                                  'mv0_avg', 'mv1_min', 'mv1_max', 'mv1_avg', 'frame_rate', 'bit_rate'])
 
     width = csv_data['width']
     height = csv_data['height']
     qp_list = csv_data['qp_avg']
     frame_type_list = csv_data['pict_type']
-    skip_ratio = csv_data['skip_ratio']
-    for i in range(len(skip_ratio)):
-        skip_ratio.set_value(i, float(skip_ratio[i].strip("%")) / 100)
+    skip_ratio = csv_data['skip_ratio'] / 100
     mv0 = csv_data['mv0_avg']
     csv_data = csv_data.dropna(axis=1, how='all')
-    number_of_frames, number_of_params = csv_data.shape
-    if number_of_params > 13:
-        mv1 = csv_data['mv1_avg']
-    else:
-        mv1 = mv0
+    mv1 = csv_data['mv1_avg']
+    frame_rate = csv_data['frame_rate'][0]
+    bit_rate = csv_data['bit_rate'][0]
     number_of_frames, number_of_params = csv_data.shape
     bit_size_list = csv_data['pkt_size']
     qp_min_list = csv_data['qp_min']
@@ -38,18 +42,20 @@ def model1(filename, frame_rate, bit_rate):
     return mos_all
 
 
-if __name__ == '__main__':
-    wb = load_workbook(filename="C:/Users/WXX/Desktop/model1_tool/Ori_data/MOS_fr_br.xlsx")
-    ws = wb.get_sheet_by_name('Sheet1')
-    t = time.time()
-    for number in range(1, 116):
+def model1_multi(dir_path):
+    ret = {}
+    for i in list_all_files(dir_path):
         try:
-            br = ws.cell(row=number + 1, column=2).value
-            fr = ws.cell(row=number + 1, column=3).value
-            mos = model1(f'C:/Users/WXX/Desktop/model1_tool/Ori_data/sequence_info/{number}.csv', frame_rate=fr,
-                         bit_rate=br)
-            print(number, mos)
+            mos = model1_single(f'{dir_path}/{i}')
+            ret[i] = mos
+            # print(i, mos)
         except:
-            print(f'---process {number}.csv fail---')
+            print(f'---process {i} fail---')
+    return ret
+
+
+if __name__ == '__main__':
+    t = time.time()
+    res = model1_multi('C:/Users/WXX/Desktop/数据集样例/video quality')
     t = time.time() - t
     print(f'total {t} seconds, averge {t/115} seconds')
